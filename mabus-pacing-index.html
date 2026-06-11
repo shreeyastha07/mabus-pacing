@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MABUS Pacing Dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --blue: #27A4DD;
+    --dark: #445469;
+    --navy: #17446B;
+    --red: #D0302F;
+    --green: #3B7D2E;
+    --amber: #B86E00;
+    --bg: #F5F7FA;
+    --surface: #FFFFFF;
+    --border: #D8DEE6;
+    --text: #2C3A47;
+    --muted: #6B7A8D;
+    --light: #EEF2F7;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* ── Header ── */
+  .site-header {
+    background: var(--navy);
+    color: #fff;
+    padding: 0 24px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+  }
+  .site-header .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: 0.01em;
+  }
+  .site-header .brand svg { opacity: 0.9; }
+  .header-actions { display: flex; gap: 8px; }
+  .btn-ghost {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.22);
+    color: #fff;
+    padding: 5px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: background 0.15s;
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,0.2); }
+
+  /* ── Layout ── */
+  .page { max-width: 980px; margin: 0 auto; padding: 24px 20px 60px; }
+
+  .top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .top-row .date-line { font-size: 13px; color: var(--muted); }
+  .btn-primary {
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+    transition: background 0.15s;
+  }
+  .btn-primary:hover { background: #1e8fc0; }
+
+  /* ── Summary cards ── */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .sum-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .sum-card .sc-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .sum-card .sc-value { font-size: 22px; font-weight: 600; color: var(--text); }
+  .sum-card .sc-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .sum-card.flagged .sc-value { color: var(--red); }
+
+  /* ── Campaign cards ── */
+  .campaigns { display: flex; flex-direction: column; gap: 14px; }
+  .camp-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    border-left: 4px solid var(--border);
+    transition: box-shadow 0.15s;
+  }
+  .camp-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.07); }
+  .camp-card.status-risk    { border-left-color: var(--red); }
+  .camp-card.status-ontrack { border-left-color: var(--blue); }
+  .camp-card.status-ahead   { border-left-color: var(--green); }
+  .camp-card.status-inactive, .camp-card.status-ended { border-left-color: var(--border); }
+
+  .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .card-name { font-size: 15px; font-weight: 600; color: var(--text); }
+  .card-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .badge-risk     { background: #FDECEA; color: var(--red); }
+  .badge-ontrack  { background: #E3F2FD; color: #1565C0; }
+  .badge-ahead    { background: #E8F5E9; color: var(--green); }
+  .badge-inactive { background: #F0F2F5; color: var(--muted); }
+  .badge-ended    { background: #F0F2F5; color: var(--muted); }
+
+  /* ── Metrics grid ── */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .m-item .m-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .m-item .m-value { font-size: 14px; font-weight: 600; color: var(--text); margin-top: 1px; }
+  .m-item .m-value.red   { color: var(--red); }
+  .m-item .m-value.green { color: var(--green); }
+  .m-item .m-value.amber { color: var(--amber); }
+
+  /* ── Progress bar ── */
+  .prog-wrap { margin-bottom: 12px; }
+  .prog-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 5px;
+  }
+  .prog-track {
+    background: var(--light);
+    border-radius: 4px;
+    height: 8px;
+    position: relative;
+    overflow: visible;
+  }
+  .prog-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+    position: relative;
+    z-index: 1;
+  }
+  .prog-ideal {
+    position: absolute;
+    top: -3px;
+    width: 2px;
+    height: 14px;
+    background: var(--dark);
+    opacity: 0.45;
+    border-radius: 1px;
+    z-index: 2;
+  }
+  .prog-ideal-label {
+    position: absolute;
+    top: 14px;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  /* ── Card actions ── */
+  .card-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+  .btn-sm {
+    background: var(--light);
+    border: 1px solid var(--border);
+    color: var(--dark);
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: background 0.15s;
+  }
+  .btn-sm:hover { background: #dde4ed; }
+  .btn-sm.danger { color: var(--red); }
+  .btn-sm.danger:hover { background: #FDECEA; border-color: #f5b5b4; }
+  .btn-sm.primary { background: var(--blue); color: #fff; border-color: var(--blue); }
+  .btn-sm.primary:hover { background: #1e8fc0; }
+
+  /* ── Empty state ── */
+  .empty-state {
+    text-align: center;
+    padding: 56px 20px;
+    color: var(--muted);
+  }
+  .empty-state svg { margin-bottom: 12px; opacity: 0.35; }
+  .empty-state p { font-size: 14px; margin-bottom: 16px; }
+
+  /* ── Modals ── */
+  .overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(17,25,40,0.5);
+    z-index: 200;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 40px 16px;
+    overflow-y: auto;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 24px;
+    width: 100%;
+    max-width: 460px;
+    position: relative;
+  }
+  .modal h2 { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 16px; }
+  .modal-close {
+    position: absolute;
+    top: 16px; right: 16px;
+    background: none; border: none;
+    font-size: 20px; cursor: pointer;
+    color: var(--muted); line-height: 1;
+  }
+  .modal-close:hover { color: var(--text); }
+  .form-group { margin-bottom: 14px; }
+  .form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .form-group input,
+  .form-group select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--text);
+    background: var(--surface);
+    outline: none;
+    transition: border 0.15s;
+  }
+  .form-group input:focus,
+  .form-group select:focus { border-color: var(--blue); }
+  .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 16px 0;
+  }
+  .form-section-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 12px;
+  }
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 20px;
+  }
+  .btn-cancel {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .btn-cancel:hover { background: var(--light); }
+  .btn-save {
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    padding: 7px 18px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .btn-save:hover { background: #1e8fc0; }
+  .btn-danger-full {
+    background: var(--red);
+    color: #fff;
+    border: none;
+    padding: 7px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .btn-danger-full:hover { background: #b02020; }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed;
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--dark);
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    z-index: 999;
+    transition: transform 0.3s;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── Sort tabs ── */
+  .sort-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+  .sort-tab {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .sort-tab:hover { border-color: var(--blue); color: var(--blue); }
+  .sort-tab.active { background: var(--blue); border-color: var(--blue); color: #fff; font-weight: 500; }
+
+  /* file input hidden */
+  #importFile { display: none; }
+
+  @media (max-width: 600px) {
+    .form-row-2 { grid-template-columns: 1fr; }
+    .metrics-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="site-header">
+  <div class="brand">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    MABUS Pacing
+  </div>
+  <div class="header-actions">
+    <button class="btn-ghost" onclick="exportData()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export
+    </button>
+    <button class="btn-ghost" onclick="document.getElementById('importFile').click()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Import
+    </button>
+    <input type="file" id="importFile" accept=".json" onchange="importData(event)">
+  </div>
+</header>
+
+<!-- Page -->
+<main class="page">
+
+  <div class="top-row">
+    <div>
+      <div style="font-size:18px;font-weight:700;color:var(--navy);margin-bottom:3px;">Campaign Pacing</div>
+      <div class="date-line" id="dateLabel"></div>
+    </div>
+    <button class="btn-primary" onclick="openAdd()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add campaign
+    </button>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary-grid" id="summaryGrid">
+    <div class="sum-card"><div class="sc-label">Total budget</div><div class="sc-value" id="sBudget">—</div></div>
+    <div class="sum-card"><div class="sc-label">Total spent</div><div class="sc-value" id="sSpent">—</div></div>
+    <div class="sum-card"><div class="sc-label">Remaining</div><div class="sc-value" id="sRemaining">—</div></div>
+    <div class="sum-card"><div class="sc-label">Avg pacing delta</div><div class="sc-value" id="sPacing">—</div><div class="sc-sub">actual vs ideal</div></div>
+    <div class="sum-card"><div class="sc-label">Flagged</div><div class="sc-value" id="sFlagged">0</div><div class="sc-sub">underpacing</div></div>
+  </div>
+
+  <!-- Sort tabs -->
+  <div class="sort-tabs">
+    <button class="sort-tab active" onclick="setSort('status',this)">By status</button>
+    <button class="sort-tab" onclick="setSort('name',this)">A–Z</button>
+    <button class="sort-tab" onclick="setSort('end',this)">Flight ending soon</button>
+    <button class="sort-tab" onclick="setSort('delta',this)">Biggest gap</button>
+  </div>
+
+  <!-- Campaign list -->
+  <div class="campaigns" id="campList">
+    <div class="empty-state">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      <p>No campaigns yet.</p>
+      <button class="btn-primary" onclick="openAdd()" style="margin:0 auto;display:inline-flex;">Add your first campaign</button>
+    </div>
+  </div>
+
+</main>
+
+<!-- ADD MODAL -->
+<div class="overlay" id="addModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeAdd()">×</button>
+    <h2>Add campaign</h2>
+    <div class="form-group">
+      <label>Advertiser name</label>
+      <input type="text" id="a_name" placeholder="e.g. Maine Savings FCU">
+    </div>
+    <div class="form-group">
+      <label>Platform</label>
+      <select id="a_platform">
+        <option>Meta</option>
+        <option>Google Display (GDN)</option>
+        <option>StackAdapt (CTV)</option>
+        <option>YouTube</option>
+      </select>
+    </div>
+    <div class="form-row-2">
+      <div class="form-group"><label>Flight start</label><input type="date" id="a_start"></div>
+      <div class="form-group"><label>Flight end</label><input type="date" id="a_end"></div>
+    </div>
+    <div class="form-group">
+      <label>Total budget ($)</label>
+      <input type="number" id="a_budget" placeholder="5000" min="0">
+    </div>
+    <hr class="form-divider">
+    <div class="form-section-label">Today's cumulative numbers</div>
+    <div class="form-row-2">
+      <div class="form-group"><label>Spend to date ($)</label><input type="number" id="a_spent" placeholder="0" min="0"></div>
+      <div class="form-group"><label>Impressions</label><input type="number" id="a_impr" placeholder="0" min="0"></div>
+    </div>
+    <div class="form-group">
+      <label>Clicks</label>
+      <input type="number" id="a_clicks" placeholder="0" min="0">
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeAdd()">Cancel</button>
+      <button class="btn-save" onclick="saveAdd()">Add campaign</button>
+    </div>
+  </div>
+</div>
+
+<!-- UPDATE MODAL -->
+<div class="overlay" id="updateModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeUpdate()">×</button>
+    <h2>Update today's numbers</h2>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:16px;" id="uCampLabel"></div>
+    <div class="form-section-label">Cumulative totals (all days so far)</div>
+    <div class="form-row-2">
+      <div class="form-group"><label>Spend to date ($)</label><input type="number" id="u_spent" min="0"></div>
+      <div class="form-group"><label>Impressions</label><input type="number" id="u_impr" min="0"></div>
+    </div>
+    <div class="form-group">
+      <label>Clicks</label>
+      <input type="number" id="u_clicks" min="0">
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeUpdate()">Cancel</button>
+      <button class="btn-save" onclick="saveUpdate()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="overlay" id="editModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeEdit()">×</button>
+    <h2>Edit campaign</h2>
+    <div class="form-group"><label>Advertiser name</label><input type="text" id="e_name"></div>
+    <div class="form-group">
+      <label>Platform</label>
+      <select id="e_platform">
+        <option>Meta</option>
+        <option>Google Display (GDN)</option>
+        <option>StackAdapt (CTV)</option>
+        <option>YouTube</option>
+      </select>
+    </div>
+    <div class="form-row-2">
+      <div class="form-group"><label>Flight start</label><input type="date" id="e_start"></div>
+      <div class="form-group"><label>Flight end</label><input type="date" id="e_end"></div>
+    </div>
+    <div class="form-group"><label>Total budget ($)</label><input type="number" id="e_budget" min="0"></div>
+    <div class="modal-footer">
+      <button class="btn-danger-full" onclick="confirmDelete()">Delete</button>
+      <button class="btn-cancel" onclick="closeEdit()">Cancel</button>
+      <button class="btn-save" onclick="saveEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+const KEY = 'mabus_pacing_v3';
+let campaigns = [];
+let sortMode = 'status';
+let editId = null;
+let updateId = null;
+
+/* ── Storage ── */
+function loadData() {
+  try { campaigns = JSON.parse(localStorage.getItem(KEY)) || []; }
+  catch(e) { campaigns = []; }
+}
+function saveData() {
+  localStorage.setItem(KEY, JSON.stringify(campaigns));
+}
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+
+/* ── Date helpers ── */
+function todayStr() {
+  return new Date().toISOString().slice(0,10);
+}
+function diffDays(a, b) {
+  return Math.round((new Date(b) - new Date(a)) / 86400000);
+}
+function formatDate(str) {
+  if (!str) return '';
+  const [y,m,d] = str.split('-');
+  return `${m}/${d}/${y}`;
+}
+
+/* ── Pacing calc ── */
+function getPacing(c) {
+  const t = todayStr();
+  if (!c.start || !c.end) return { status:'inactive', label:'No dates', pct:0, ideal:0, delta:0 };
+  if (t < c.start) return { status:'inactive', label:'Not started', pct:0, ideal:0, delta:0 };
+  if (t > c.end) {
+    const pct = c.budget > 0 ? Math.round(c.spent / c.budget * 100) : 0;
+    return { status:'ended', label:'Ended', pct, ideal:100, delta: pct - 100 };
+  }
+  const total = diffDays(c.start, c.end);
+  const elapsed = diffDays(c.start, t);
+  const ideal = total > 0 ? Math.round(elapsed / total * 100) : 0;
+  const actual = c.budget > 0 ? Math.round(c.spent / c.budget * 100) : 0;
+  const delta = actual - ideal;
+  let status, label;
+  if (delta < -10)      { status='risk';    label='Underpacing'; }
+  else if (delta > 10)  { status='ahead';   label='Overpacing'; }
+  else                  { status='ontrack'; label='On track'; }
+  return { status, label, pct: actual, ideal, delta };
+}
+
+function daysLeft(c) {
+  const t = todayStr();
+  if (!c.end) return 0;
+  if (t > c.end) return 0;
+  if (t < c.start) return diffDays(c.start, c.end);
+  return diffDays(t, c.end);
+}
+
+function idealDaily(c) {
+  const left = daysLeft(c);
+  if (left <= 0 || c.budget <= 0) return 0;
+  const rem = c.budget - (c.spent || 0);
+  return rem > 0 ? Math.round(rem / left) : 0;
+}
+
+/* ── Format helpers ── */
+function fmtMoney(n) {
+  return '$' + Math.round(n).toLocaleString('en-US');
+}
+function fmtNum(n) {
+  return Math.round(n).toLocaleString('en-US');
+}
+function fmtDelta(d) {
+  return (d >= 0 ? '+' : '') + d + '%';
+}
+function fillColor(status) {
+  if (status === 'risk')    return '#D0302F';
+  if (status === 'ahead')   return '#3B7D2E';
+  if (status === 'ontrack') return '#27A4DD';
+  return '#B0BEC5';
+}
+
+/* ── Sorting ── */
+function setSort(mode, el) {
+  sortMode = mode;
+  document.querySelectorAll('.sort-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderList();
+}
+
+function sortedCampaigns() {
+  const statusOrder = { risk:0, ontrack:1, ahead:2, inactive:3, ended:4 };
+  const arr = [...campaigns];
+  if (sortMode === 'status') {
+    return arr.sort((a,b) => {
+      const pa = getPacing(a), pb = getPacing(b);
+      return (statusOrder[pa.status]??5) - (statusOrder[pb.status]??5);
+    });
+  }
+  if (sortMode === 'name') {
+    return arr.sort((a,b) => a.name.localeCompare(b.name));
+  }
+  if (sortMode === 'end') {
+    return arr.sort((a,b) => (a.end||'9999') < (b.end||'9999') ? -1 : 1);
+  }
+  if (sortMode === 'delta') {
+    return arr.sort((a,b) => getPacing(a).delta - getPacing(b).delta);
+  }
+  return arr;
+}
+
+/* ── Render ── */
+function renderSummary() {
+  const total = campaigns.reduce((s,c) => s + (c.budget||0), 0);
+  const spent = campaigns.reduce((s,c) => s + (c.spent||0), 0);
+  const remaining = total - spent;
+  const active = campaigns.filter(c => {
+    const t = todayStr();
+    return c.start <= t && c.end >= t;
+  });
+  const pacings = active.map(c => getPacing(c)).filter(p => !['inactive','ended'].includes(p.status));
+  const avgDelta = pacings.length ? Math.round(pacings.reduce((s,p) => s + p.delta, 0) / pacings.length) : null;
+  const flagged = pacings.filter(p => p.status === 'risk').length;
+
+  document.getElementById('sBudget').textContent = fmtMoney(total);
+  document.getElementById('sSpent').textContent = fmtMoney(spent);
+  document.getElementById('sRemaining').textContent = fmtMoney(remaining);
+
+  const pEl = document.getElementById('sPacing');
+  pEl.textContent = avgDelta !== null ? fmtDelta(avgDelta) : '—';
+  pEl.style.color = avgDelta === null ? '' : avgDelta < -10 ? 'var(--red)' : avgDelta > 10 ? 'var(--green)' : 'var(--text)';
+
+  const fEl = document.getElementById('sFlagged');
+  fEl.textContent = flagged;
+  fEl.parentElement.classList.toggle('flagged', flagged > 0);
+}
+
+function renderList() {
+  const el = document.getElementById('campList');
+  if (!campaigns.length) {
+    el.innerHTML = `<div class="empty-state">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      <p>No campaigns yet.</p>
+      <button class="btn-primary" onclick="openAdd()" style="margin:0 auto;display:inline-flex;">Add your first campaign</button>
+    </div>`;
+    return;
+  }
+  el.innerHTML = sortedCampaigns().map(c => buildCard(c)).join('');
+}
+
+function buildCard(c) {
+  const p = getPacing(c);
+  const left = daysLeft(c);
+  const daily = idealDaily(c);
+  const ctr = c.impr > 0 ? ((c.clicks||0) / c.impr * 100).toFixed(2) + '%' : '—';
+  const idealPos = Math.min(p.ideal, 100);
+  const deltaClass = p.delta < -10 ? 'red' : p.delta > 10 ? 'green' : '';
+
+  return `<div class="camp-card status-${p.status}" id="card_${c.id}">
+    <div class="card-top">
+      <div>
+        <div class="card-name">${esc(c.name)}</div>
+        <div class="card-meta">${esc(c.platform)} &nbsp;·&nbsp; ${formatDate(c.start)} → ${formatDate(c.end)} &nbsp;·&nbsp; ${left > 0 ? left + ' days left' : 'flight ended'}</div>
+      </div>
+      <span class="badge badge-${p.status}">${p.label}</span>
+    </div>
+
+    <div class="metrics-grid">
+      <div class="m-item"><div class="m-label">Spent</div><div class="m-value">${fmtMoney(c.spent||0)}</div></div>
+      <div class="m-item"><div class="m-label">Budget</div><div class="m-value">${fmtMoney(c.budget||0)}</div></div>
+      <div class="m-item"><div class="m-label">Remaining</div><div class="m-value">${fmtMoney((c.budget||0)-(c.spent||0))}</div></div>
+      <div class="m-item"><div class="m-label">Ideal daily</div><div class="m-value">${fmtMoney(daily)}</div></div>
+      <div class="m-item"><div class="m-label">Pacing delta</div><div class="m-value ${deltaClass}">${fmtDelta(p.delta)}</div></div>
+      <div class="m-item"><div class="m-label">Impressions</div><div class="m-value">${c.impr > 0 ? fmtNum(c.impr) : '—'}</div></div>
+      <div class="m-item"><div class="m-label">Clicks</div><div class="m-value">${c.clicks > 0 ? fmtNum(c.clicks) : '—'}</div></div>
+      <div class="m-item"><div class="m-label">CTR</div><div class="m-value">${ctr}</div></div>
+    </div>
+
+    <div class="prog-wrap">
+      <div class="prog-labels">
+        <span>Spend progress</span>
+        <span>${p.pct}% spent &nbsp;·&nbsp; ${p.ideal}% of flight elapsed</span>
+      </div>
+      <div class="prog-track">
+        <div class="prog-fill" style="width:${Math.min(p.pct,100)}%;background:${fillColor(p.status)};"></div>
+        <div class="prog-ideal" style="left:${idealPos}%;"></div>
+        <div class="prog-ideal-label" style="left:${idealPos}%;">ideal</div>
+      </div>
+    </div>
+
+    <div class="card-actions">
+      <button class="btn-sm primary" onclick="openUpdate('${c.id}')">↻ Update today</button>
+      <button class="btn-sm" onclick="openEdit('${c.id}')">✎ Edit</button>
+      <button class="btn-sm danger" onclick="deleteCamp('${c.id}')">✕ Remove</button>
+    </div>
+  </div>`;
+}
+
+function esc(str) {
+  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function render() {
+  renderSummary();
+  renderList();
+}
+
+/* ── Add ── */
+function openAdd() {
+  document.getElementById('addModal').classList.add('open');
+  document.getElementById('a_name').focus();
+}
+function closeAdd() {
+  document.getElementById('addModal').classList.remove('open');
+  ['a_name','a_start','a_end','a_budget','a_spent','a_impr','a_clicks'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+}
+function saveAdd() {
+  const name = document.getElementById('a_name').value.trim();
+  if (!name) { alert('Please enter an advertiser name.'); return; }
+  campaigns.push({
+    id: uid(),
+    name,
+    platform: document.getElementById('a_platform').value,
+    start: document.getElementById('a_start').value,
+    end: document.getElementById('a_end').value,
+    budget: parseFloat(document.getElementById('a_budget').value) || 0,
+    spent: parseFloat(document.getElementById('a_spent').value) || 0,
+    impr: parseInt(document.getElementById('a_impr').value) || 0,
+    clicks: parseInt(document.getElementById('a_clicks').value) || 0,
+  });
+  saveData(); render(); closeAdd(); toast('Campaign added');
+}
+
+/* ── Update ── */
+function openUpdate(id) {
+  updateId = id;
+  const c = campaigns.find(x => x.id === id);
+  document.getElementById('uCampLabel').textContent = c.name + ' — ' + c.platform;
+  document.getElementById('u_spent').value = c.spent || 0;
+  document.getElementById('u_impr').value = c.impr || 0;
+  document.getElementById('u_clicks').value = c.clicks || 0;
+  document.getElementById('updateModal').classList.add('open');
+  document.getElementById('u_spent').focus();
+}
+function closeUpdate() {
+  document.getElementById('updateModal').classList.remove('open');
+  updateId = null;
+}
+function saveUpdate() {
+  const c = campaigns.find(x => x.id === updateId);
+  if (!c) return;
+  c.spent = parseFloat(document.getElementById('u_spent').value) || 0;
+  c.impr = parseInt(document.getElementById('u_impr').value) || 0;
+  c.clicks = parseInt(document.getElementById('u_clicks').value) || 0;
+  saveData(); render(); closeUpdate(); toast('Numbers updated');
+}
+
+/* ── Edit ── */
+function openEdit(id) {
+  editId = id;
+  const c = campaigns.find(x => x.id === id);
+  document.getElementById('e_name').value = c.name;
+  document.getElementById('e_platform').value = c.platform;
+  document.getElementById('e_start').value = c.start || '';
+  document.getElementById('e_end').value = c.end || '';
+  document.getElementById('e_budget').value = c.budget || 0;
+  document.getElementById('editModal').classList.add('open');
+}
+function closeEdit() {
+  document.getElementById('editModal').classList.remove('open');
+  editId = null;
+}
+function saveEdit() {
+  const c = campaigns.find(x => x.id === editId);
+  if (!c) return;
+  c.name = document.getElementById('e_name').value.trim() || c.name;
+  c.platform = document.getElementById('e_platform').value;
+  c.start = document.getElementById('e_start').value;
+  c.end = document.getElementById('e_end').value;
+  c.budget = parseFloat(document.getElementById('e_budget').value) || 0;
+  saveData(); render(); closeEdit(); toast('Campaign updated');
+}
+function confirmDelete() {
+  if (confirm('Delete this campaign? This cannot be undone.')) {
+    campaigns = campaigns.filter(c => c.id !== editId);
+    saveData(); render(); closeEdit(); toast('Campaign removed');
+  }
+}
+function deleteCamp(id) {
+  const c = campaigns.find(x => x.id === id);
+  if (confirm(`Remove "${c.name}"?`)) {
+    campaigns = campaigns.filter(x => x.id !== id);
+    saveData(); render(); toast('Campaign removed');
+  }
+}
+
+/* ── Export / Import ── */
+function exportData() {
+  const blob = new Blob([JSON.stringify({ version:3, exported: new Date().toISOString(), campaigns }, null, 2)], { type:'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'mabus-pacing-' + todayStr() + '.json';
+  a.click();
+  toast('Exported successfully');
+}
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const data = JSON.parse(ev.target.result);
+      const incoming = data.campaigns || data;
+      if (!Array.isArray(incoming)) throw new Error('Invalid format');
+      if (!confirm(`Import ${incoming.length} campaign(s)? This will replace your current data.`)) return;
+      campaigns = incoming;
+      saveData(); render(); toast('Imported successfully');
+    } catch(err) {
+      alert('Could not read file. Make sure it is a valid MABUS Pacing export.');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+/* ── Toast ── */
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+/* ── Close modals on overlay click ── */
+['addModal','updateModal','editModal'].forEach(id => {
+  document.getElementById(id).addEventListener('click', function(e) {
+    if (e.target === this) {
+      this.classList.remove('open');
+      editId = null; updateId = null;
+    }
+  });
+});
+
+/* ── Keyboard shortcuts ── */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    ['addModal','updateModal','editModal'].forEach(id => document.getElementById(id).classList.remove('open'));
+    editId = null; updateId = null;
+  }
+});
+
+/* ── Init ── */
+document.getElementById('dateLabel').textContent = new Date().toLocaleDateString('en-US', {
+  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+});
+
+loadData();
+render();
+</script>
+</body>
+</html>
